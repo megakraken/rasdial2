@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install MinGW-w64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            mingw-w64-x86_64-gcc
+            mingw-w64-i686-gcc
+
+      - name: Build with MinGW (x64)
+        shell: msys2 {0}
+        env:
+          MSYSTEM: MINGW64
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          x86_64-w64-mingw32-gcc rasdial2.c -O2 -Wall -municode -static -s -lrasapi32 -o rasdial2.exe
+
+      - name: Build with MinGW (x86)
+        shell: msys2 {0}
+        env:
+          MSYSTEM: MINGW32
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          gcc rasdial2.c -O2 -Wall -municode -static -s -lrasapi32 -o rasdial2_x86.exe
+
+      - name: Delete old release assets
+        uses: dev-drprasad/delete-tag-and-release@v1.0
+        with:
+          tag_name: latest
+          delete_release: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: rasdial2
+          target_commitish: ${{ github.sha }}
+          draft: false
+          prerelease: false
+          files: |
+            rasdial2.exe
+            rasdial2_x86.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
